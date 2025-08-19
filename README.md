@@ -155,6 +155,47 @@ curl -X POST http://localhost:3000/api/auth/login \
 # 使用 token 访问受保护的端点
 curl -X GET http://localhost:3000/api/profile \
   -H "Authorization: Bearer <your_jwt_token>"
+
+# 退出登录（撤销当前token）
+curl -X POST http://localhost:3000/api/auth/logout \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# 退出所有设备（撤销用户的所有token）
+curl -X POST http://localhost:3000/api/auth/logout-all \
+  -H "Authorization: Bearer <your_jwt_token>"
+```
+
+## Token 持久化
+
+本项目实现了完整的 JWT Token 持久化机制，具有以下特性：
+
+### 🔐 Token 管理
+- **Redis 存储**: 所有 JWT Token 都存储在 Redis 中，支持过期时间管理
+- **即时撤销**: 用户退出登录时立即从 Redis 中删除 token
+- **批量撤销**: 支持撤销用户所有设备的 token（安全场景）
+- **自动清理**: 过期的 token 自动从 Redis 中清除
+
+### 🛡️ 安全增强
+- **双重验证**: 验证 JWT 签名 + Redis 存在性检查
+- **会话管理**: 跟踪用户的活跃会话数量
+- **设备隔离**: 支持按设备管理 token（可扩展）
+- **防止重放**: 已撤销的 token 无法再次使用
+
+### 📋 API 端点
+- `POST /api/auth/register` - 用户注册（生成并存储 token）
+- `POST /api/auth/login` - 用户登录（生成并存储 token）
+- `POST /api/auth/logout` - 退出当前设备（撤销当前 token）
+- `POST /api/auth/logout-all` - 退出所有设备（撤销所有 token）
+
+### 🧪 测试功能
+运行 `test_token_persistence.ps1` 脚本测试 token 持久化功能：
+
+```powershell
+# 确保服务器运行中
+cargo run
+
+# 在另一个终端运行测试
+./test_token_persistence.ps1
 ```
 
 ## 安全注意事项

@@ -14,7 +14,7 @@ use axum::{
 use crate::{
     config::Config,
     db::DbPool,
-    handlers::{get_all_users, get_profile, login, register},
+    handlers::{get_all_users, get_profile, login, logout, logout_all, register},
     middleware::auth_middleware,
     redis::RedisManager,
 };
@@ -57,14 +57,16 @@ pub fn create_routes(pool: DbPool, redis_manager: RedisManager, config: Config) 
     // 这些路由不需要用户登录即可访问
     let auth_routes = Router::new()
         .route("/register", post(register)) // 用户注册
-        .route("/login", post(login));       // 用户登录
+        .route("/login", post(login))       // 用户登录
+        .route("/logout", post(logout))     // 退出登录（需要token）
+        .route("/logout-all", post(logout_all)); // 退出所有设备（需要token）
 
     // 受保护的路由
     // 这些路由需要有效的 JWT Token 才能访问
     let protected_routes = Router::new()
         .route("/profile", get(get_profile))      // 获取用户个人信息
         .route("/users", get(get_all_users))      // 获取所有用户列表
-        .layer(middleware::from_fn_with_state(config, auth_middleware)); // 应用身份验证中间件
+        .layer(middleware::from_fn_with_state(app_state.clone(), auth_middleware)); // 应用身份验证中间件
 
     // 组合所有路由
     Router::new()

@@ -14,9 +14,9 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    config::Config,
     error::{AppError, Result},
-    utils::verify_jwt,
+    routes::AppState,
+    services::TokenService,
 };
 
 /// 身份验证中间件函数
@@ -72,7 +72,7 @@ use crate::{
 ///     .layer(middleware::from_fn_with_state(config, auth_middleware));
 /// ```
 pub async fn auth_middleware(
-    State(config): State<Config>,
+    State(app_state): State<AppState>,
     mut request: Request,
     next: Next,
 ) -> Result<Response> {
@@ -88,8 +88,8 @@ pub async fn auth_middleware(
         .strip_prefix("Bearer ")
         .ok_or_else(|| AppError::Authentication("Invalid authorization header format".to_string()))?;
 
-    // 验证 JWT Token 的有效性
-    let claims = verify_jwt(token, &config.jwt_secret)?;
+    // 使用 TokenService 验证 token（包括 Redis 存在性检查）
+    let claims = TokenService::verify_token(&app_state.redis, token, &app_state.config.jwt_secret).await?;
     
     // 从 Token claims 中提取用户 ID
     let user_id = Uuid::parse_str(&claims.sub)

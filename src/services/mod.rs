@@ -15,10 +15,15 @@
  * # 子模块
  * 
  * - `user_service`: 用户管理相关的业务逻辑
+ * - `token_service`: Token 管理服务，处理 JWT token 的 Redis 持久化
  */
 
 /// 用户业务逻辑服务
 pub mod user_service;
 
+/// Token 管理服务
+pub mod token_service;
+
 // 重新导出所有服务，方便外部使用
 pub use user_service::*;
+pub use token_service::*;
