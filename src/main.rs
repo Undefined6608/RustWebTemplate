@@ -5,11 +5,12 @@
  * - 初始化日志系统
  * - 加载配置信息
  * - 建立数据库连接池
+ * - 建立Redis连接
  * - 配置路由和中间件
  * - 启动 HTTP 服务器
  */
 
-use hello_rust::{config::Config, db::create_pool, routes::create_routes};
+use hello_rust::{config::Config, db::create_pool, redis::RedisManager, routes::create_routes};
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -42,8 +43,12 @@ async fn main() -> anyhow::Result<()> {
     let pool = create_pool(&config.database_url).await?;
     tracing::info!("Database connection established");
 
+    // 创建Redis连接管理器
+    let redis_manager = RedisManager::new(&config).await?;
+    tracing::info!("Redis connection established");
+
     // 创建应用路由和中间件栈
-    let app = create_routes(pool, config.clone())
+    let app = create_routes(pool, redis_manager, config.clone())
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http()) // HTTP 请求追踪中间件

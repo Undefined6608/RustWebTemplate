@@ -13,6 +13,7 @@
  * - `config`: 应用配置管理
  * - `db`: 数据库连接和操作
  * - `error`: 统一错误处理
+ * - `redis`: Redis 缓存和工具
  * - `handlers`: HTTP 请求处理器
  * - `middleware`: 中间件（如身份验证）
  * - `models`: 数据模型定义
@@ -25,6 +26,7 @@
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod redis;
 
 // Web 相关模块
 pub mod handlers;
@@ -41,3 +43,4 @@ pub mod utils;
 // 重新导出常用类型，方便外部使用
 pub use config::Config;
 pub use error::{AppError, Result};
+pub use redis::{RedisManager, RedisUtils};

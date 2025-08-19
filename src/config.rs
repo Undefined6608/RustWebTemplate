@@ -48,6 +48,19 @@ pub struct Config {
     
     /// CORS 允许的源列表
     pub cors_allowed_origins: Option<Vec<String>>,
+    
+    /// Redis 连接 URL
+    /// 格式：redis://用户名:密码@主机:端口/数据库编号
+    pub redis_url: String,
+    
+    /// Redis 连接池最大连接数
+    pub redis_max_connections: u32,
+    
+    /// Redis 连接超时时间（秒）
+    pub redis_connection_timeout: u64,
+    
+    /// Redis 键的默认过期时间（秒）
+    pub redis_default_expiry: Option<u64>,
 }
 
 impl Config {
@@ -67,6 +80,10 @@ impl Config {
     /// - `DB_MIN_CONNECTIONS`: 数据库连接池最小连接数
     /// - `DB_CONNECTION_TIMEOUT`: 数据库连接超时时间
     /// - `CORS_ALLOWED_ORIGINS`: CORS 允许的源列表（逗号分隔）
+    /// - `REDIS_URL`: Redis 连接 URL
+    /// - `REDIS_MAX_CONNECTIONS`: Redis 连接池最大连接数
+    /// - `REDIS_CONNECTION_TIMEOUT`: Redis 连接超时时间
+    /// - `REDIS_DEFAULT_EXPIRY`: Redis 键的默认过期时间
     /// 
     /// # 返回值
     /// 
@@ -136,6 +153,27 @@ impl Config {
                         .filter(|s| !s.is_empty())
                         .collect()
                 }),
+            
+            // Redis 连接 URL，默认连接到本地 Redis
+            redis_url: env::var("REDIS_URL")
+                .unwrap_or_else(|_| "redis://localhost:6379/0".to_string()),
+            
+            // Redis 连接池最大连接数，默认 10
+            redis_max_connections: env::var("REDIS_MAX_CONNECTIONS")
+                .unwrap_or_else(|_| "10".to_string())
+                .parse()
+                .unwrap_or(10),
+            
+            // Redis 连接超时时间，默认 30 秒
+            redis_connection_timeout: env::var("REDIS_CONNECTION_TIMEOUT")
+                .unwrap_or_else(|_| "30".to_string())
+                .parse()
+                .unwrap_or(30),
+            
+            // Redis 键的默认过期时间，可选配置
+            redis_default_expiry: env::var("REDIS_DEFAULT_EXPIRY")
+                .ok()
+                .and_then(|s| s.parse().ok()),
         })
     }
 

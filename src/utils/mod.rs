@@ -30,6 +30,7 @@
  * - `crypto`: 加密、编码和哈希
  * - `convert`: 类型转换和数据格式转换
  * - `format`: 格式化输出和显示
+ * - `redis`: Redis 缓存和工具
  */
 
 /// JWT 身份验证工具
@@ -59,6 +60,9 @@ pub mod convert;
 /// 格式化工具
 pub mod format;
 
+/// Redis 缓存工具
+pub mod redis;
+
 // 重新导出所有工具函数，方便外部使用
 pub use auth::*;
 pub use password::*;
@@ -69,3 +73,4 @@ pub use collection::*;
 pub use crypto::*;
 pub use convert::*;
 pub use format::*;
+pub use redis::*;

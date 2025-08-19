@@ -34,6 +34,9 @@ sqlx = { version = "0.7", features = [
     "migrate"                 # 数据库迁移支持
 ] }
 
+# Redis 缓存和键值存储
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }  # Redis 异步客户端
+
 # 序列化和反序列化
 serde = { version = "1.0", features = ["derive"] }  # 序列化框架
 serde_json = "1.0"                                   # JSON 支持

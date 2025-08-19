@@ -16,16 +16,19 @@ use crate::{
     db::DbPool,
     handlers::{get_all_users, get_profile, login, register},
     middleware::auth_middleware,
+    redis::RedisManager,
 };
 
 /// 应用程序状态
 /// 
 /// 包含在整个应用程序生命周期中需要共享的数据，
-/// 如数据库连接池和配置信息。
+/// 如数据库连接池、Redis管理器和配置信息。
 #[derive(Clone)]
 pub struct AppState {
     /// 数据库连接池
     pub pool: DbPool,
+    /// Redis管理器
+    pub redis: RedisManager,
     /// 应用配置
     pub config: Config,
 }
@@ -40,14 +43,15 @@ pub struct AppState {
 /// # 参数
 /// 
 /// * `pool` - 数据库连接池
+/// * `redis_manager` - Redis管理器
 /// * `config` - 应用配置
 /// 
 /// # 返回值
 /// 
 /// 返回配置好的 Axum Router
-pub fn create_routes(pool: DbPool, config: Config) -> Router {
-    // 创建应用状态，包含共享的数据库连接池和配置
-    let app_state = AppState { pool, config: config.clone() };
+pub fn create_routes(pool: DbPool, redis_manager: RedisManager, config: Config) -> Router {
+    // 创建应用状态，包含共享的数据库连接池、Redis管理器和配置
+    let app_state = AppState { pool, redis: redis_manager, config: config.clone() };
 
     // 公开的身份验证路由
     // 这些路由不需要用户登录即可访问
