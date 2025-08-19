@@ -31,6 +31,7 @@
  * - `convert`: 类型转换和数据格式转换
  * - `format`: 格式化输出和显示
  * - `redis`: Redis 缓存和工具
+ * - `device`: 设备类型检测和管理
  */
 
 /// JWT 身份验证工具
@@ -63,6 +64,9 @@ pub mod format;
 /// Redis 缓存工具
 pub mod redis;
 
+/// 设备检测工具
+pub mod device;
+
 // 重新导出所有工具函数，方便外部使用
 pub use auth::*;
 pub use password::*;
@@ -74,3 +78,4 @@ pub use crypto::*;
 pub use convert::*;
 pub use format::*;
 pub use redis::*;
+pub use device::*;

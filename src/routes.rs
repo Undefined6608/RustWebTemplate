@@ -14,7 +14,7 @@ use axum::{
 use crate::{
     config::Config,
     db::DbPool,
-    handlers::{get_all_users, get_profile, login, logout, logout_all, register},
+    handlers::{get_all_users, get_profile, login, logout, logout_all, logout_device, get_sessions, register},
     middleware::auth_middleware,
     redis::RedisManager,
 };
@@ -59,7 +59,9 @@ pub fn create_routes(pool: DbPool, redis_manager: RedisManager, config: Config) 
         .route("/register", post(register)) // 用户注册
         .route("/login", post(login))       // 用户登录
         .route("/logout", post(logout))     // 退出登录（需要token）
-        .route("/logout-all", post(logout_all)); // 退出所有设备（需要token）
+        .route("/logout-all", post(logout_all)) // 退出所有设备（需要token）
+        .route("/sessions", get(get_sessions)) // 获取活跃会话列表（需要token）
+        .route("/logout-device/:device_type", post(logout_device)); // 撤销特定设备登录（需要token）
 
     // 受保护的路由
     // 这些路由需要有效的 JWT Token 才能访问

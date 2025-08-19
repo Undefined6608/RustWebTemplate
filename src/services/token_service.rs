@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::{
     error::{AppError, Result},
     redis::RedisManager,
-    utils::{generate_jwt, verify_jwt, Claims},
+    utils::{generate_jwt, verify_jwt, Claims, DeviceInfo, DeviceType},
 };
 
 /// Token 信息结构体
@@ -26,8 +26,8 @@ pub struct TokenInfo {
     pub created_at: i64,
     /// Token 过期时间
     pub expires_at: i64,
-    /// 设备信息（可选）
-    pub device_info: Option<String>,
+    /// 设备信息
+    pub device_info: DeviceInfo,
     /// IP 地址（可选）
     pub ip_address: Option<String>,
 }
@@ -42,29 +42,39 @@ impl TokenService {
     /// 用户 token 集合的键前缀（用于快速查找用户的所有 token）
     const USER_TOKENS_PREFIX: &'static str = "auth:user_tokens:";
     
+    /// 用户设备 token 的键前缀（用于单设备类型登录控制）
+    const USER_DEVICE_TOKEN_PREFIX: &'static str = "auth:user_device:";
+    
     /// Token 的默认过期时间（24小时，与JWT保持一致）
     const TOKEN_EXPIRY_SECONDS: u64 = 24 * 60 * 60;
 
-    /// 生成并存储 token
+    /// 生成并存储 token（支持单设备类型登录）
     /// 
     /// # 参数
     /// 
     /// * `redis` - Redis 管理器
     /// * `user_id` - 用户 ID
     /// * `jwt_secret` - JWT 密钥
-    /// * `device_info` - 设备信息（可选）
+    /// * `device_info` - 设备信息
     /// * `ip_address` - IP 地址（可选）
     /// 
     /// # 返回值
     /// 
     /// 返回生成的 JWT token 字符串
+    /// 
+    /// # 注意
+    /// 
+    /// 此方法会自动撤销用户在同类设备上的其他登录会话
     pub async fn create_token(
         redis: &RedisManager,
         user_id: Uuid,
         jwt_secret: &str,
-        device_info: Option<String>,
+        device_info: DeviceInfo,
         ip_address: Option<String>,
     ) -> Result<String> {
+        // 先撤销用户在同类设备上的现有登录
+        Self::revoke_device_tokens(redis, user_id, &device_info.device_type).await?;
+        
         // 生成 JWT token
         let token = generate_jwt(user_id, jwt_secret)?;
         
@@ -76,13 +86,14 @@ impl TokenService {
             user_id,
             created_at: now.timestamp(),
             expires_at: expires_at.timestamp(),
-            device_info,
+            device_info: device_info.clone(),
             ip_address,
         };
 
         // 在 Redis 中存储 token 信息
         let token_key = format!("{}{}", Self::TOKEN_PREFIX, token);
         let user_tokens_key = format!("{}{}", Self::USER_TOKENS_PREFIX, user_id);
+        let user_device_key = format!("{}{}{}", Self::USER_DEVICE_TOKEN_PREFIX, user_id, device_info.device_type);
         
         // 使用 Redis pipeline 提高性能
         use redis::AsyncCommands;
@@ -99,6 +110,10 @@ impl TokenService {
         // 将 token 添加到用户的 token 集合中
         let _: () = conn.sadd(&user_tokens_key, &token).await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis添加用户token失败: {}", e)))?;
+        
+        // 存储设备类型对应的 token（用于单设备登录控制）
+        let _: () = conn.set_ex(&user_device_key, &token, Self::TOKEN_EXPIRY_SECONDS).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis存储设备token失败: {}", e)))?;
         
         // 为用户 token 集合设置过期时间（比 token 稍长一些）
         let _: () = conn.expire(&user_tokens_key, (Self::TOKEN_EXPIRY_SECONDS + 3600) as i64).await
@@ -174,6 +189,19 @@ impl TokenService {
         use redis::AsyncCommands;
         let mut conn = redis.connection().clone();
         
+        // 获取 token 信息以确定设备类型
+        let token_info_str: Option<String> = conn.get(&token_key).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis获取token信息失败: {}", e)))?;
+        
+        if let Some(info_str) = token_info_str {
+            if let Ok(token_info) = serde_json::from_str::<TokenInfo>(&info_str) {
+                // 删除设备 token 记录
+                let user_device_key = format!("{}{}{}", Self::USER_DEVICE_TOKEN_PREFIX, user_id, token_info.device_info.device_type);
+                let _: () = conn.del(&user_device_key).await
+                    .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis删除设备token记录失败: {}", e)))?;
+            }
+        }
+        
         // 删除 token 信息
         let _: () = conn.del(&token_key).await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis删除token失败: {}", e)))?;
@@ -214,6 +242,13 @@ impl TokenService {
         // 删除用户 token 集合
         let _: () = conn.del(&user_tokens_key).await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis删除用户token集合失败: {}", e)))?;
+        
+        // 删除所有设备类型的 token 记录
+        for device_type in [DeviceType::Web, DeviceType::Mobile, DeviceType::Desktop, DeviceType::Api] {
+            let user_device_key = format!("{}{}{}", Self::USER_DEVICE_TOKEN_PREFIX, user_id, device_type);
+            let _: () = conn.del(&user_device_key).await
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis删除设备token记录失败: {}", e)))?;
+        }
 
         Ok(())
     }
@@ -274,6 +309,100 @@ impl TokenService {
         }
     }
 
+    /// 撤销用户在特定设备类型上的所有 token
+    /// 
+    /// # 参数
+    /// 
+    /// * `redis` - Redis 管理器
+    /// * `user_id` - 用户 ID
+    /// * `device_type` - 设备类型
+    pub async fn revoke_device_tokens(
+        redis: &RedisManager,
+        user_id: Uuid,
+        device_type: &DeviceType,
+    ) -> Result<()> {
+        let user_device_key = format!("{}{}{}", Self::USER_DEVICE_TOKEN_PREFIX, user_id, device_type);
+        
+        use redis::AsyncCommands;
+        let mut conn = redis.connection().clone();
+        
+        // 获取该设备类型的现有 token
+        let existing_token: Option<String> = conn.get(&user_device_key).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis获取设备token失败: {}", e)))?;
+        
+        if let Some(token) = existing_token {
+            // 撤销现有的 token
+            Self::revoke_token(redis, &token, user_id).await?;
+        }
+        
+        // 删除设备 token 记录
+        let _: () = conn.del(&user_device_key).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis删除设备token记录失败: {}", e)))?;
+        
+        Ok(())
+    }
+
+    /// 获取用户在特定设备类型上的活跃 token
+    /// 
+    /// # 参数
+    /// 
+    /// * `redis` - Redis 管理器
+    /// * `user_id` - 用户 ID
+    /// * `device_type` - 设备类型
+    /// 
+    /// # 返回值
+    /// 
+    /// 返回该设备类型的活跃 token（如果存在）
+    pub async fn get_device_token(
+        redis: &RedisManager,
+        user_id: Uuid,
+        device_type: &DeviceType,
+    ) -> Result<Option<String>> {
+        let user_device_key = format!("{}{}{}", Self::USER_DEVICE_TOKEN_PREFIX, user_id, device_type);
+        
+        use redis::AsyncCommands;
+        let mut conn = redis.connection().clone();
+        
+        let token: Option<String> = conn.get(&user_device_key).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis获取设备token失败: {}", e)))?;
+        
+        Ok(token)
+    }
+
+    /// 获取用户所有设备的活跃会话信息
+    /// 
+    /// # 参数
+    /// 
+    /// * `redis` - Redis 管理器
+    /// * `user_id` - 用户 ID
+    /// 
+    /// # 返回值
+    /// 
+    /// 返回包含设备类型和token信息的向量
+    pub async fn get_user_device_sessions(
+        redis: &RedisManager,
+        user_id: Uuid,
+    ) -> Result<Vec<(DeviceType, TokenInfo)>> {
+        use redis::AsyncCommands;
+        let mut conn = redis.connection().clone();
+        
+        let mut sessions = Vec::new();
+        
+        // 遍历所有设备类型
+        for device_type in [DeviceType::Web, DeviceType::Mobile, DeviceType::Desktop, DeviceType::Api] {
+            let user_device_key = format!("{}{}{}", Self::USER_DEVICE_TOKEN_PREFIX, user_id, device_type);
+            
+            if let Ok(Some(token)) = conn.get::<_, Option<String>>(&user_device_key).await {
+                // 获取 token 信息
+                if let Ok(Some(token_info)) = Self::get_token_info(redis, &token).await {
+                    sessions.push((device_type, token_info));
+                }
+            }
+        }
+        
+        Ok(sessions)
+    }
+
     /// 清理过期的 token（可选的维护功能）
     /// 
     /// 这个方法可以由定时任务调用，清理 Redis 中可能残留的过期 token
@@ -311,6 +440,11 @@ impl TokenService {
                         let user_tokens_key = format!("{}{}", Self::USER_TOKENS_PREFIX, token_info.user_id);
                         let _: () = conn.srem(&user_tokens_key, token).await
                             .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis移除用户过期token失败: {}", e)))?;
+                        
+                        // 删除设备 token 记录
+                        let user_device_key = format!("{}{}{}", Self::USER_DEVICE_TOKEN_PREFIX, token_info.user_id, token_info.device_info.device_type);
+                        let _: () = conn.del(&user_device_key).await
+                            .map_err(|e| AppError::Internal(anyhow::anyhow!("Redis删除过期设备token记录失败: {}", e)))?;
                         
                         cleaned_count += 1;
                     }

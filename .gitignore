@@ -53,3 +53,5 @@ node_modules/
 
 # SQLx
 .sqlx/
+
+postgres_data/

@@ -5,7 +5,7 @@
  * 包括用户账户创建、身份验证、JWT Token 生成和撤销。
  */
 
-use axum::{extract::State, http::header::AUTHORIZATION, Json, extract::Request};
+use axum::{extract::State, http::header::{AUTHORIZATION, USER_AGENT}, Json, extract::Request};
 use uuid::Uuid;
 
 use crate::{
@@ -13,7 +13,34 @@ use crate::{
     models::{AuthResponse, CreateUserRequest, LoginRequest},
     routes::AppState,
     services::{UserService, TokenService},
+    utils::DeviceInfo,
 };
+
+/// 从HTTP请求中提取设备信息
+/// 
+/// # 参数
+/// 
+/// * `request` - HTTP 请求对象
+/// 
+/// # 返回值
+/// 
+/// 返回解析后的设备信息
+fn extract_device_info(request: &Request) -> DeviceInfo {
+    // 从请求头中获取 User-Agent
+    let user_agent = request
+        .headers()
+        .get(USER_AGENT)
+        .and_then(|header| header.to_str().ok())
+        .unwrap_or("Unknown");
+    
+    // 从请求头中获取设备类型提示（可选的自定义头部）
+    let device_type_hint = request
+        .headers()
+        .get("X-Device-Type")
+        .and_then(|header| header.to_str().ok());
+    
+    DeviceInfo::from_user_agent(user_agent, device_type_hint)
+}
 
 /// 用户注册处理器
 /// 
@@ -59,18 +86,36 @@ use crate::{
 /// * `request` - 用户注册请求数据
 pub async fn register(
     State(app_state): State<AppState>,
-    Json(request): Json<CreateUserRequest>,
+    request: Request,
 ) -> Result<Json<AuthResponse>> {
+    // 提取设备信息
+    let device_info = extract_device_info(&request);
+    
+    // 提取IP地址（从连接信息或代理头部）
+    let ip_address = request
+        .headers()
+        .get("X-Forwarded-For")
+        .or_else(|| request.headers().get("X-Real-IP"))
+        .and_then(|header| header.to_str().ok())
+        .map(|s| s.split(',').next().unwrap_or(s).trim().to_string());
+    
+    // 提取JSON请求体
+    let (_, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX).await
+        .map_err(|e| AppError::Validation(format!("读取请求体失败: {}", e)))?;
+    let create_user_request: CreateUserRequest = serde_json::from_slice(&bytes)
+        .map_err(|e| AppError::Validation(format!("JSON解析失败: {}", e)))?;
+    
     // 调用用户服务创建新用户
-    let user = UserService::create_user(&app_state.pool, request).await?;
+    let user = UserService::create_user(&app_state.pool, create_user_request).await?;
     
     // 使用 TokenService 生成并存储 token 到 Redis
     let token = TokenService::create_token(
         &app_state.redis,
         user.id,
         &app_state.config.jwt_secret,
-        None, // device_info，可以从请求头获取
-        None, // ip_address，可以从请求中提取
+        device_info,
+        ip_address,
     ).await?;
     
     // 构造响应数据
@@ -125,18 +170,36 @@ pub async fn register(
 /// * `request` - 用户登录请求数据
 pub async fn login(
     State(app_state): State<AppState>,
-    Json(request): Json<LoginRequest>,
+    request: Request,
 ) -> Result<Json<AuthResponse>> {
-    // 验证用户凭据
-    let user = UserService::authenticate_user(&app_state.pool, request).await?;
+    // 提取设备信息
+    let device_info = extract_device_info(&request);
     
-    // 使用 TokenService 生成并存储 token 到 Redis
+    // 提取IP地址（从连接信息或代理头部）
+    let ip_address = request
+        .headers()
+        .get("X-Forwarded-For")
+        .or_else(|| request.headers().get("X-Real-IP"))
+        .and_then(|header| header.to_str().ok())
+        .map(|s| s.split(',').next().unwrap_or(s).trim().to_string());
+    
+    // 提取JSON请求体
+    let (_, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX).await
+        .map_err(|e| AppError::Validation(format!("读取请求体失败: {}", e)))?;
+    let login_request: LoginRequest = serde_json::from_slice(&bytes)
+        .map_err(|e| AppError::Validation(format!("JSON解析失败: {}", e)))?;
+    
+    // 验证用户凭据
+    let user = UserService::authenticate_user(&app_state.pool, login_request).await?;
+    
+    // 使用 TokenService 生成并存储 token 到 Redis（会自动撤销同设备类型的其他登录）
     let token = TokenService::create_token(
         &app_state.redis,
         user.id,
         &app_state.config.jwt_secret,
-        None, // device_info，可以从请求头获取
-        None, // ip_address，可以从请求中提取
+        device_info,
+        ip_address,
     ).await?;
     
     // 构造响应数据
@@ -265,5 +328,153 @@ pub async fn logout_all(
     Ok(Json(serde_json::json!({
         "message": "已撤销所有登录会话",
         "revoked_count": token_count
+    })))
+}
+
+/// 获取用户活跃会话列表处理器
+/// 
+/// 返回用户在所有设备类型上的活跃登录会话信息。
+/// 
+/// # 请求
+/// 
+/// - **方法**: GET
+/// - **路径**: `/api/auth/sessions`
+/// - **请求头**: 必须包含有效的 Authorization header
+/// 
+/// # 响应
+/// 
+/// 成功时返回用户的所有活跃会话：
+/// ```json
+/// {
+///   "sessions": [
+///     {
+///       "device_type": "web",
+///       "device_name": "Chrome on Windows 10",
+///       "created_at": "2023-01-01T10:00:00Z",
+///       "ip_address": "192.168.1.100",
+///       "is_current": true
+///     },
+///     {
+///       "device_type": "mobile",
+///       "device_name": "iOS Device",
+///       "created_at": "2023-01-01T09:00:00Z",
+///       "ip_address": "192.168.1.101",
+///       "is_current": false
+///     }
+///   ]
+/// }
+/// ```
+/// 
+/// # 参数
+/// 
+/// * `app_state` - 应用程序状态
+/// * `request` - HTTP 请求对象
+pub async fn get_sessions(
+    State(app_state): State<AppState>,
+    request: Request,
+) -> Result<Json<serde_json::Value>> {
+    // 从请求头中提取 Authorization 字段
+    let auth_header = request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|header| header.to_str().ok())
+        .ok_or_else(|| AppError::Authentication("Missing authorization header".to_string()))?;
+
+    // 验证 Authorization 头的格式
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| AppError::Authentication("Invalid authorization header format".to_string()))?;
+
+    // 先验证 token 以获取用户 ID
+    let claims = TokenService::verify_token(&app_state.redis, token, &app_state.config.jwt_secret).await?;
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| AppError::Authentication("Invalid user ID in token".to_string()))?;
+
+    // 获取用户所有设备的活跃会话
+    let device_sessions = TokenService::get_user_device_sessions(&app_state.redis, user_id).await?;
+    
+    // 转换为响应格式
+    let mut sessions = Vec::new();
+    for (device_type, token_info) in device_sessions {
+        let session = serde_json::json!({
+            "device_type": device_type.to_string(),
+            "device_name": token_info.device_info.display_name(),
+            "created_at": chrono::DateTime::from_timestamp(token_info.created_at, 0)
+                .unwrap_or_default()
+                .to_rfc3339(),
+            "ip_address": token_info.ip_address,
+            "is_current": false // 后面可以通过比较token来确定是否为当前会话
+        });
+        sessions.push(session);
+    }
+    
+    // 返回会话列表
+    Ok(Json(serde_json::json!({
+        "sessions": sessions
+    })))
+}
+
+/// 撤销特定设备类型的登录会话处理器
+/// 
+/// 撤销用户在指定设备类型上的登录会话。
+/// 
+/// # 请求
+/// 
+/// - **方法**: POST
+/// - **路径**: `/api/auth/logout-device/{device_type}`
+/// - **请求头**: 必须包含有效的 Authorization header
+/// 
+/// # 响应
+/// 
+/// 成功时返回撤销结果：
+/// ```json
+/// {
+///   "message": "已撤销Web设备的登录会话"
+/// }
+/// ```
+/// 
+/// # 参数
+/// 
+/// * `app_state` - 应用程序状态
+/// * `request` - HTTP 请求对象
+/// * `device_type` - 要撤销的设备类型
+pub async fn logout_device(
+    State(app_state): State<AppState>,
+    axum::extract::Path(device_type_str): axum::extract::Path<String>,
+    request: Request,
+) -> Result<Json<serde_json::Value>> {
+    // 从请求头中提取 Authorization 字段
+    let auth_header = request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|header| header.to_str().ok())
+        .ok_or_else(|| AppError::Authentication("Missing authorization header".to_string()))?;
+
+    // 验证 Authorization 头的格式
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| AppError::Authentication("Invalid authorization header format".to_string()))?;
+
+    // 先验证 token 以获取用户 ID
+    let claims = TokenService::verify_token(&app_state.redis, token, &app_state.config.jwt_secret).await?;
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| AppError::Authentication("Invalid user ID in token".to_string()))?;
+
+    // 解析设备类型
+    let device_type = crate::utils::DeviceType::from_str(&device_type_str);
+    
+    // 撤销指定设备类型的token
+    TokenService::revoke_device_tokens(&app_state.redis, user_id, &device_type).await?;
+    
+    let device_name = match device_type {
+        crate::utils::DeviceType::Web => "Web",
+        crate::utils::DeviceType::Mobile => "移动",
+        crate::utils::DeviceType::Desktop => "桌面",
+        crate::utils::DeviceType::Api => "API",
+    };
+
+    // 返回成功响应
+    Ok(Json(serde_json::json!({
+        "message": format!("已撤销{}设备的登录会话", device_name)
     })))
 }

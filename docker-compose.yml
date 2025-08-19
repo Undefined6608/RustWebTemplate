@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15
     environment:
       POSTGRES_DB: hello_rust
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: 5da715e0-24ac-48a7-8998-5f7821bbf79f
     ports:
       - "5432:5432"
     volumes:
@@ -32,4 +30,14 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./postgres_data
+      o: bind
   redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./redis_data
+      o: bind
