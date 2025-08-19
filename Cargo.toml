@@ -1,49 +1,87 @@
+# Rust Web 应用程序模板
+# 
+# 这是一个功能完整的 Rust Web 应用程序模板，包含：
+# - JWT 身份验证系统
+# - PostgreSQL 数据库集成
+# - RESTful API 设计
+# - 丰富的工具函数库
+# - 完整的错误处理机制
+
 [package]
 name = "hello_rust"
 version = "0.1.0"
 edition = "2021"
+description = "A modern Rust web application template with authentication, database, and utilities"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/hello_rust"
+keywords = ["web", "api", "jwt", "postgres", "axum"]
+categories = ["web-programming::http-server"]
 
 [dependencies]
-# Web 框架
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
-tokio = { version = "1.0", features = ["full"] }
+# Web 框架和 HTTP 服务
+axum = "0.7"                      # 现代异步 Web 框架
+tower = "0.4"                     # 服务抽象和中间件
+tower-http = { version = "0.5", features = ["cors", "trace"] }  # HTTP 中间件
+tokio = { version = "1.0", features = ["full"] }                # 异步运行时
 
-# 数据库
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "migrate"] }
+# 数据库访问层
+sqlx = { version = "0.7", features = [
+    "runtime-tokio-rustls",   # Tokio 运行时 + Rustls TLS
+    "postgres",               # PostgreSQL 支持
+    "chrono",                 # 时间类型支持
+    "uuid",                   # UUID 类型支持
+    "migrate"                 # 数据库迁移支持
+] }
 
-# 序列化
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# 序列化和反序列化
+serde = { version = "1.0", features = ["derive"] }  # 序列化框架
+serde_json = "1.0"                                   # JSON 支持
 
-# JWT 和密码加密
-jsonwebtoken = "9.2"
-argon2 = "0.5"
+# 身份验证和密码安全
+jsonwebtoken = "9.2"              # JWT Token 处理
+argon2 = "0.5"                    # 安全密码哈希算法
 
-# 日志和追踪
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# 日志和调试
+tracing = "0.1"                   # 结构化日志和追踪
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }  # 日志订阅器
 
-# 时间处理
-chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = "0.8"
+# 时间和日期处理
+chrono = { version = "0.4", features = ["serde"] }  # 时间日期库
+chrono-tz = "0.8"                                   # 时区支持
 
-# UUID
-uuid = { version = "1.0", features = ["v4", "serde"] }
+# 唯一标识符
+uuid = { version = "1.0", features = ["v4", "serde"] }  # UUID 生成和序列化
 
-# 环境变量
-dotenvy = "0.15"
+# 配置管理
+dotenvy = "0.15"                  # 环境变量和 .env 文件支持
 
 # 错误处理
-anyhow = "1.0"
-thiserror = "1.0"
+anyhow = "1.0"                    # 灵活的错误处理
+thiserror = "1.0"                 # 自定义错误类型宏
 
-# 工具库
-regex = "1.10"
-base64 = "0.21"
-hex = "0.4"
-rand = "0.8"
-url = "2.4"
-mime = "0.3"
-unicode-segmentation = "1.10"
+# 通用工具库
+regex = "1.10"                    # 正则表达式
+base64 = "0.21"                   # Base64 编码/解码
+hex = "0.4"                       # 十六进制编码/解码
+rand = "0.8"                      # 随机数生成
+url = "2.4"                       # URL 解析和构建
+mime = "0.3"                      # MIME 类型处理
+unicode-segmentation = "1.10"     # Unicode 字符串分割
+
+# 开发时依赖
+[dev-dependencies]
+# 这里可以添加测试和开发相关的依赖
+
+# 构建配置
+[profile.release]
+# 生产环境优化配置
+opt-level = 3          # 最高优化级别
+lto = true             # 链接时优化
+codegen-units = 1      # 单个代码生成单元（更好的优化）
+panic = "abort"        # 崩溃时直接终止（更小的二进制文件）
+
+[profile.dev]
+# 开发环境配置
+opt-level = 0          # 无优化（更快的编译）
+debug = true           # 包含调试信息
