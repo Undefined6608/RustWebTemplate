@@ -1,6 +1,6 @@
 /*!
  * 设备类型检测工具
- * 
+ *
  * 提供设备类型识别和管理功能，用于实现单设备类型单点登录。
  */
 
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// 设备类型枚举
-/// 
+///
 /// 用于区分不同类型的客户端设备，实现单设备类型的登录限制。
 /// 每种设备类型只能有一个活跃的登录会话。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -48,7 +48,7 @@ impl DeviceType {
 }
 
 /// 设备信息结构体
-/// 
+///
 /// 包含设备的详细信息，用于存储和管理设备会话。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceInfo {
@@ -66,18 +66,18 @@ pub struct DeviceInfo {
 
 impl DeviceInfo {
     /// 从 User-Agent 字符串解析设备信息
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `user_agent` - HTTP 请求中的 User-Agent 字符串
     /// * `device_type_hint` - 可选的设备类型提示（从客户端传入）
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// 返回解析后的设备信息
-    /// 
+    ///
     /// # 示例
-    /// 
+    ///
     /// ```rust
     /// let user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
     /// let device_info = DeviceInfo::from_user_agent(user_agent, None);
@@ -107,29 +107,30 @@ impl DeviceInfo {
         let ua_lower = user_agent.to_lowercase();
 
         // 检测移动设备
-        if ua_lower.contains("mobile") 
-            || ua_lower.contains("iphone") 
-            || ua_lower.contains("ipad") 
-            || ua_lower.contains("android") 
-            || ua_lower.contains("blackberry") 
-            || ua_lower.contains("windows phone") {
+        if ua_lower.contains("mobile")
+            || ua_lower.contains("iphone")
+            || ua_lower.contains("ipad")
+            || ua_lower.contains("android")
+            || ua_lower.contains("blackberry")
+            || ua_lower.contains("windows phone")
+        {
             return DeviceType::Mobile;
         }
 
         // 检测桌面应用（Electron 等）
-        if ua_lower.contains("electron") 
-            || ua_lower.contains("desktop") 
-            || ua_lower.contains("app") {
+        if ua_lower.contains("electron") || ua_lower.contains("desktop") || ua_lower.contains("app")
+        {
             return DeviceType::Desktop;
         }
 
         // 检测Web浏览器
-        if ua_lower.contains("mozilla") 
-            || ua_lower.contains("chrome") 
-            || ua_lower.contains("safari") 
-            || ua_lower.contains("firefox") 
-            || ua_lower.contains("edge") 
-            || ua_lower.contains("opera") {
+        if ua_lower.contains("mozilla")
+            || ua_lower.contains("chrome")
+            || ua_lower.contains("safari")
+            || ua_lower.contains("firefox")
+            || ua_lower.contains("edge")
+            || ua_lower.contains("opera")
+        {
             return DeviceType::Web;
         }
 
@@ -140,7 +141,7 @@ impl DeviceInfo {
     /// 解析 User-Agent 中的详细信息
     fn parse_user_agent_details(user_agent: &str) -> (Option<String>, Option<String>) {
         let ua_lower = user_agent.to_lowercase();
-        
+
         // 解析操作系统信息
         let os_info = if ua_lower.contains("windows nt 10.0") {
             Some("Windows 10".to_string())
@@ -158,7 +159,10 @@ impl DeviceInfo {
             Some("Linux".to_string())
         } else if ua_lower.contains("android") {
             Some("Android".to_string())
-        } else if ua_lower.contains("ios") || ua_lower.contains("iphone") || ua_lower.contains("ipad") {
+        } else if ua_lower.contains("ios")
+            || ua_lower.contains("iphone")
+            || ua_lower.contains("ipad")
+        {
             Some("iOS".to_string())
         } else {
             None
@@ -189,26 +193,20 @@ impl DeviceInfo {
         browser_info: &Option<String>,
     ) -> Option<String> {
         match device_type {
-            DeviceType::Web => {
-                match (browser_info, os_info) {
-                    (Some(browser), Some(os)) => Some(format!("{} on {}", browser, os)),
-                    (Some(browser), None) => Some(browser.clone()),
-                    (None, Some(os)) => Some(format!("Browser on {}", os)),
-                    (None, None) => Some("Web Browser".to_string()),
-                }
-            }
-            DeviceType::Mobile => {
-                match os_info {
-                    Some(os) => Some(format!("{} Device", os)),
-                    None => Some("Mobile Device".to_string()),
-                }
-            }
-            DeviceType::Desktop => {
-                match os_info {
-                    Some(os) => Some(format!("Desktop App on {}", os)),
-                    None => Some("Desktop App".to_string()),
-                }
-            }
+            DeviceType::Web => match (browser_info, os_info) {
+                (Some(browser), Some(os)) => Some(format!("{} on {}", browser, os)),
+                (Some(browser), None) => Some(browser.clone()),
+                (None, Some(os)) => Some(format!("Browser on {}", os)),
+                (None, None) => Some("Web Browser".to_string()),
+            },
+            DeviceType::Mobile => match os_info {
+                Some(os) => Some(format!("{} Device", os)),
+                None => Some("Mobile Device".to_string()),
+            },
+            DeviceType::Desktop => match os_info {
+                Some(os) => Some(format!("Desktop App on {}", os)),
+                None => Some("Desktop App".to_string()),
+            },
             DeviceType::Api => Some("API Client".to_string()),
         }
     }
@@ -225,7 +223,7 @@ impl DeviceInfo {
     }
 
     /// 获取设备唯一标识符
-    /// 
+    ///
     /// 用于在 Redis 中区分不同设备类型的会话
     pub fn get_device_key(&self) -> String {
         format!("device:{}", self.device_type)
@@ -249,10 +247,15 @@ mod tests {
         let chrome_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
         let device_info = DeviceInfo::from_user_agent(chrome_ua, None);
         assert_eq!(device_info.device_type, DeviceType::Web);
-        assert!(device_info.browser_info.as_ref().unwrap().contains("Chrome"));
+        assert!(device_info
+            .browser_info
+            .as_ref()
+            .unwrap()
+            .contains("Chrome"));
 
         // Test mobile devices
-        let mobile_ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15";
+        let mobile_ua =
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15";
         let device_info = DeviceInfo::from_user_agent(mobile_ua, None);
         assert_eq!(device_info.device_type, DeviceType::Mobile);
 

@@ -1,6 +1,6 @@
-use std::str::FromStr;
+use serde_json::{from_str, to_string, Value};
 use std::fmt::Display;
-use serde_json::{Value, from_str, to_string};
+use std::str::FromStr;
 use url::Url;
 
 /// 类型转换工具结构体
@@ -62,14 +62,14 @@ impl ConvertUtils {
         if hex.len() % 2 != 0 {
             return Err("Invalid hex string length".into());
         }
-        
+
         let mut bytes = Vec::new();
         for chunk in hex.as_bytes().chunks(2) {
             let hex_str = std::str::from_utf8(chunk)?;
             let byte = u8::from_str_radix(hex_str, 16)?;
             bytes.push(byte);
         }
-        
+
         Ok(bytes)
     }
 
@@ -108,7 +108,7 @@ impl ConvertUtils {
     /// 解析 URL
     pub fn parse_url(url_str: &str) -> Result<ParsedUrl, url::ParseError> {
         let url = Url::parse(url_str)?;
-        
+
         Ok(ParsedUrl {
             scheme: url.scheme().to_string(),
             host: url.host_str().map(|s| s.to_string()),
@@ -128,20 +128,21 @@ impl ConvertUtils {
         query_params: Option<&[(&str, &str)]>,
     ) -> Result<String, url::ParseError> {
         let mut url = Url::parse(&format!("{}://{}", scheme, host))?;
-        
+
         if let Some(port) = port {
-            url.set_port(Some(port)).map_err(|_| url::ParseError::InvalidPort)?;
+            url.set_port(Some(port))
+                .map_err(|_| url::ParseError::InvalidPort)?;
         }
-        
+
         url.set_path(path);
-        
+
         if let Some(params) = query_params {
             let mut query_pairs = url.query_pairs_mut();
             for &(key, value) in params {
                 query_pairs.append_pair(key, value);
             }
         }
-        
+
         Ok(url.to_string())
     }
 
@@ -158,7 +159,7 @@ impl ConvertUtils {
         if s.is_empty() {
             return Vec::new();
         }
-        
+
         s.split(delimiter)
             .map(|item| item.trim().to_string())
             .filter(|item| !item.is_empty())
@@ -171,7 +172,7 @@ impl ConvertUtils {
         let mut current_field = String::new();
         let mut in_quotes = false;
         let mut chars = csv_row.chars().peekable();
-        
+
         while let Some(ch) = chars.next() {
             match ch {
                 '"' => {
@@ -192,7 +193,7 @@ impl ConvertUtils {
                 }
             }
         }
-        
+
         result.push(current_field);
         result
     }
@@ -215,19 +216,19 @@ impl ConvertUtils {
     pub fn bytes_to_human_readable(bytes: u64) -> String {
         const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB", "PB"];
         const THRESHOLD: f64 = 1024.0;
-        
+
         if bytes == 0 {
             return "0 B".to_string();
         }
-        
+
         let mut size = bytes as f64;
         let mut unit_index = 0;
-        
+
         while size >= THRESHOLD && unit_index < UNITS.len() - 1 {
             size /= THRESHOLD;
             unit_index += 1;
         }
-        
+
         if unit_index == 0 {
             format!("{} {}", bytes, UNITS[unit_index])
         } else {
@@ -243,9 +244,9 @@ impl ConvertUtils {
         } else {
             (size_str.as_str(), "B")
         };
-        
+
         let number: f64 = number_part.trim().parse().ok()?;
-        
+
         let multiplier = match unit_part.trim() {
             "B" => 1,
             "KB" => 1024,
@@ -255,22 +256,22 @@ impl ConvertUtils {
             "PB" => 1024_u64.pow(5),
             _ => return None,
         };
-        
+
         Some((number * multiplier as f64) as u64)
     }
 
     /// 颜色格式转换：HEX 转 RGB
     pub fn hex_to_rgb(hex: &str) -> Option<(u8, u8, u8)> {
         let hex = hex.trim_start_matches('#');
-        
+
         if hex.len() != 6 {
             return None;
         }
-        
+
         let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
         let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
         let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
-        
+
         Some((r, g, b))
     }
 
@@ -350,20 +351,19 @@ use std::convert::TryFrom;
 // 为了支持 URL 解码，我们需要手动实现一个简单版本
 mod urlencoding {
     pub fn encode(input: &str) -> String {
-        input.chars()
-            .map(|c| {
-                match c {
-                    'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-                    _ => format!("%{:02X}", c as u8),
-                }
+        input
+            .chars()
+            .map(|c| match c {
+                'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+                _ => format!("%{:02X}", c as u8),
             })
             .collect()
     }
-    
+
     pub fn decode(input: &str) -> Result<String, Box<dyn std::error::Error>> {
         let mut result = Vec::new();
         let mut chars = input.chars();
-        
+
         while let Some(c) = chars.next() {
             match c {
                 '%' => {
@@ -378,12 +378,10 @@ mod urlencoding {
                 _ => result.push(c as u8),
             }
         }
-        
+
         String::from_utf8(result).map_err(|e| e.into())
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -409,7 +407,7 @@ mod tests {
     fn test_human_readable_bytes() {
         assert_eq!(ConvertUtils::bytes_to_human_readable(1024), "1.00 KB");
         assert_eq!(ConvertUtils::bytes_to_human_readable(1048576), "1.00 MB");
-        
+
         assert_eq!(ConvertUtils::human_readable_to_bytes("1 KB"), Some(1024));
         assert_eq!(ConvertUtils::human_readable_to_bytes("1 MB"), Some(1048576));
     }
@@ -431,7 +429,7 @@ mod tests {
         let arr = vec![1, 2, 3, 4];
         let delimited = ConvertUtils::array_to_delimited_string(&arr, ",");
         assert_eq!(delimited, "1,2,3,4");
-        
+
         let back_to_array = ConvertUtils::delimited_string_to_array(&delimited, ",");
         assert_eq!(back_to_array, vec!["1", "2", "3", "4"]);
     }

@@ -17,22 +17,22 @@ impl FormatUtils {
         let parts: Vec<&str> = formatted.split('.').collect();
         let integer_part = parts[0];
         let decimal_part = if parts.len() > 1 { parts[1] } else { "" };
-        
+
         let mut result = String::new();
         let chars: Vec<char> = integer_part.chars().collect();
-        
+
         for (i, ch) in chars.iter().rev().enumerate() {
             if i > 0 && i % 3 == 0 {
                 result.insert(0, ',');
             }
             result.insert(0, *ch);
         }
-        
+
         if !decimal_part.is_empty() {
             result.push('.');
             result.push_str(decimal_part);
         }
-        
+
         result
     }
 
@@ -45,19 +45,19 @@ impl FormatUtils {
     pub fn format_file_size(bytes: u64) -> String {
         const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB", "PB"];
         const THRESHOLD: f64 = 1024.0;
-        
+
         if bytes == 0 {
             return "0 B".to_string();
         }
-        
+
         let mut size = bytes as f64;
         let mut unit_index = 0;
-        
+
         while size >= THRESHOLD && unit_index < UNITS.len() - 1 {
             size /= THRESHOLD;
             unit_index += 1;
         }
-        
+
         if unit_index == 0 {
             format!("{} {}", bytes, UNITS[unit_index])
         } else {
@@ -71,9 +71,9 @@ impl FormatUtils {
         let hours = (seconds % 86400) / 3600;
         let minutes = (seconds % 3600) / 60;
         let secs = seconds % 60;
-        
+
         let mut parts = Vec::new();
-        
+
         if days > 0 {
             parts.push(format!("{}天", days));
         }
@@ -86,7 +86,7 @@ impl FormatUtils {
         if secs > 0 || parts.is_empty() {
             parts.push(format!("{}秒", secs));
         }
-        
+
         parts.join("")
     }
 
@@ -96,22 +96,34 @@ impl FormatUtils {
         let hours = (seconds % 86400) / 3600;
         let minutes = (seconds % 3600) / 60;
         let secs = seconds % 60;
-        
+
         let mut parts = Vec::new();
-        
+
         if days > 0 {
             parts.push(format!("{} day{}", days, if days > 1 { "s" } else { "" }));
         }
         if hours > 0 {
-            parts.push(format!("{} hour{}", hours, if hours > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} hour{}",
+                hours,
+                if hours > 1 { "s" } else { "" }
+            ));
         }
         if minutes > 0 {
-            parts.push(format!("{} minute{}", minutes, if minutes > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} minute{}",
+                minutes,
+                if minutes > 1 { "s" } else { "" }
+            ));
         }
         if secs > 0 || parts.is_empty() {
-            parts.push(format!("{} second{}", secs, if secs > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} second{}",
+                secs,
+                if secs > 1 { "s" } else { "" }
+            ));
         }
-        
+
         parts.join(", ")
     }
 
@@ -119,7 +131,7 @@ impl FormatUtils {
     pub fn format_relative_time(datetime: &DateTime<Utc>) -> String {
         let now = Utc::now();
         let diff = now.signed_duration_since(*datetime);
-        
+
         if diff.num_seconds() < 60 {
             "刚刚".to_string()
         } else if diff.num_minutes() < 60 {
@@ -138,7 +150,7 @@ impl FormatUtils {
     /// 格式化电话号码（中国）
     pub fn format_phone_cn(phone: &str) -> String {
         let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
-        
+
         if digits.len() == 11 && digits.starts_with('1') {
             format!("{}-{}-{}", &digits[0..3], &digits[3..7], &digits[7..11])
         } else {
@@ -160,10 +172,10 @@ impl FormatUtils {
     /// 格式化银行卡号（隐藏中间部分）
     pub fn format_bank_card_masked(card_number: &str) -> String {
         let digits: String = card_number.chars().filter(|c| c.is_ascii_digit()).collect();
-        
+
         if digits.len() >= 8 {
             let visible_start = &digits[0..4];
-            let visible_end = &digits[digits.len()-4..];
+            let visible_end = &digits[digits.len() - 4..];
             let masked_middle = "*".repeat(digits.len() - 8);
             format!("{} {} {}", visible_start, masked_middle, visible_end)
         } else {
@@ -176,13 +188,13 @@ impl FormatUtils {
         if let Some(at_pos) = email.find('@') {
             let username = &email[0..at_pos];
             let domain = &email[at_pos..];
-            
+
             if username.len() <= 2 {
                 format!("{}****{}", &username[0..1], domain)
             } else {
                 let visible_chars = (username.len() / 3).max(1);
                 let visible_start = &username[0..visible_chars];
-                let visible_end = &username[username.len()-visible_chars..];
+                let visible_end = &username[username.len() - visible_chars..];
                 format!("{}****{}{}", visible_start, visible_end, domain)
             }
         } else {
@@ -195,10 +207,10 @@ impl FormatUtils {
         if headers.is_empty() || rows.is_empty() {
             return String::new();
         }
-        
+
         // 计算每列的最大宽度
         let mut col_widths = headers.iter().map(|h| h.len()).collect::<Vec<_>>();
-        
+
         for row in rows {
             for (i, cell) in row.iter().enumerate() {
                 if i < col_widths.len() {
@@ -206,23 +218,23 @@ impl FormatUtils {
                 }
             }
         }
-        
+
         let mut result = String::new();
-        
+
         // 表头
         result.push('|');
         for (i, header) in headers.iter().enumerate() {
             result.push_str(&format!(" {:width$} |", header, width = col_widths[i]));
         }
         result.push('\n');
-        
+
         // 分隔线
         result.push('|');
         for &width in &col_widths {
             result.push_str(&format!(" {} |", "-".repeat(width)));
         }
         result.push('\n');
-        
+
         // 数据行
         for row in rows {
             result.push('|');
@@ -232,7 +244,7 @@ impl FormatUtils {
             }
             result.push('\n');
         }
-        
+
         result
     }
 
@@ -246,11 +258,16 @@ impl FormatUtils {
     pub fn format_key_value_list(data: &HashMap<String, String>) -> String {
         let mut result = String::new();
         let max_key_length = data.keys().map(|k| k.len()).max().unwrap_or(0);
-        
+
         for (key, value) in data {
-            result.push_str(&format!("{:width$}: {}\n", key, value, width = max_key_length));
+            result.push_str(&format!(
+                "{:width$}: {}\n",
+                key,
+                value,
+                width = max_key_length
+            ));
         }
-        
+
         result
     }
 
@@ -262,15 +279,22 @@ impl FormatUtils {
         filled_char: char,
         empty_char: char,
     ) -> String {
-        let percentage = if total == 0 { 0.0 } else { current as f64 / total as f64 };
+        let percentage = if total == 0 {
+            0.0
+        } else {
+            current as f64 / total as f64
+        };
         let filled_width = (width as f64 * percentage) as usize;
         let empty_width = width - filled_width;
-        
+
         let filled = filled_char.to_string().repeat(filled_width);
         let empty = empty_char.to_string().repeat(empty_width);
         let percent_text = format!(" {:.1}%", percentage * 100.0);
-        
-        format!("[{}{}] {}/{}{}", filled, empty, current, total, percent_text)
+
+        format!(
+            "[{}{}] {}/{}{}",
+            filled, empty, current, total, percent_text
+        )
     }
 
     /// 格式化列表（带缩进）
@@ -312,12 +336,12 @@ impl FormatUtils {
         let lines: Vec<&str> = text.lines().collect();
         let max_width = lines.iter().map(|line| line.len()).max().unwrap_or(0);
         let box_width = max_width + 2 * padding + 2; // +2 for borders
-        
+
         let mut result = String::new();
-        
+
         // 顶部边框
         result.push_str(&format!("┌{}┐\n", "─".repeat(box_width - 2)));
-        
+
         // 内容行
         for line in &lines {
             let padded_line = format!(
@@ -330,10 +354,10 @@ impl FormatUtils {
             );
             result.push_str(&padded_line);
         }
-        
+
         // 底部边框
         result.push_str(&format!("└{}┘", "─".repeat(box_width - 2)));
-        
+
         result
     }
 
@@ -359,7 +383,7 @@ impl FormatUtils {
             "white" => "37",
             _ => "37", // 默认白色
         };
-        
+
         format!("\x1b[{}m{}\x1b[0m", color_code, text)
     }
 
@@ -391,7 +415,10 @@ mod tests {
     #[test]
     fn test_format_duration() {
         assert_eq!(FormatUtils::format_duration(3661), "1小时1分钟1秒");
-        assert_eq!(FormatUtils::format_duration_en(3661), "1 hour, 1 minute, 1 second");
+        assert_eq!(
+            FormatUtils::format_duration_en(3661),
+            "1 hour, 1 minute, 1 second"
+        );
     }
 
     #[test]
@@ -405,7 +432,7 @@ mod tests {
             FormatUtils::format_email_masked("test@example.com"),
             "t****t@example.com"
         );
-        
+
         assert_eq!(
             FormatUtils::format_bank_card_masked("1234567890123456"),
             "1234 **** 3456"
@@ -431,7 +458,7 @@ mod tests {
             vec!["Alice".to_string(), "25".to_string()],
             vec!["Bob".to_string(), "30".to_string()],
         ];
-        
+
         let table = FormatUtils::format_table(&headers, &rows);
         assert!(table.contains("Name"));
         assert!(table.contains("Alice"));

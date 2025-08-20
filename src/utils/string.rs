@@ -1,6 +1,6 @@
 use regex::Regex;
-use unicode_segmentation::UnicodeSegmentation;
 use std::collections::HashMap;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// 字符串工具结构体
 pub struct StringUtils;
@@ -20,7 +20,7 @@ impl StringUtils {
     pub fn truncate(s: &str, max_length: usize) -> String {
         let mut result = String::new();
         let mut length = 0;
-        
+
         for grapheme in s.graphemes(true) {
             if length + grapheme.len() > max_length {
                 break;
@@ -28,7 +28,7 @@ impl StringUtils {
             result.push_str(grapheme);
             length += grapheme.len();
         }
-        
+
         result
     }
 
@@ -51,7 +51,7 @@ impl StringUtils {
     pub fn camel_to_snake(s: &str) -> String {
         let mut result = String::new();
         let mut prev_lowercase = false;
-        
+
         for c in s.chars() {
             if c.is_uppercase() && prev_lowercase {
                 result.push('_');
@@ -59,7 +59,7 @@ impl StringUtils {
             result.push(c.to_lowercase().next().unwrap_or(c));
             prev_lowercase = c.is_lowercase();
         }
-        
+
         result
     }
 
@@ -67,7 +67,7 @@ impl StringUtils {
     pub fn snake_to_camel(s: &str) -> String {
         let mut result = String::new();
         let mut capitalize_next = false;
-        
+
         for c in s.chars() {
             if c == '_' {
                 capitalize_next = true;
@@ -78,7 +78,7 @@ impl StringUtils {
                 result.push(c);
             }
         }
-        
+
         result
     }
 
@@ -140,10 +140,10 @@ impl StringUtils {
             let total_padding = width - current_width;
             let left_padding = total_padding / 2;
             let right_padding = total_padding - left_padding;
-            
+
             let left_pad = pad_char.to_string().repeat(left_padding);
             let right_pad = pad_char.to_string().repeat(right_padding);
-            
+
             format!("{}{}{}", left_pad, s, right_pad)
         }
     }
@@ -198,7 +198,10 @@ impl StringUtils {
 
     /// 验证身份证号格式（中国）
     pub fn is_valid_id_card_cn(id_card: &str) -> bool {
-        let re = Regex::new(r"^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$").unwrap();
+        let re = Regex::new(
+            r"^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$",
+        )
+        .unwrap();
         re.is_match(id_card)
     }
 
@@ -209,7 +212,7 @@ impl StringUtils {
                                 abcdefghijklmnopqrstuvwxyz\
                                 0123456789";
         let mut rng = rand::thread_rng();
-        
+
         (0..length)
             .map(|_| {
                 let idx = rng.gen_range(0..CHARSET.len());
@@ -222,7 +225,7 @@ impl StringUtils {
     pub fn random_numeric_string(length: usize) -> String {
         use rand::Rng;
         let mut rng = rand::thread_rng();
-        
+
         (0..length)
             .map(|_| rng.gen_range(0..10).to_string())
             .collect()
@@ -232,7 +235,7 @@ impl StringUtils {
     pub fn similarity(s1: &str, s2: &str) -> f64 {
         let distance = Self::levenshtein_distance(s1, s2);
         let max_len = s1.len().max(s2.len());
-        
+
         if max_len == 0 {
             1.0
         } else {
@@ -246,40 +249,48 @@ impl StringUtils {
         let s2_chars: Vec<char> = s2.chars().collect();
         let s1_len = s1_chars.len();
         let s2_len = s2_chars.len();
-        
+
         let mut matrix = vec![vec![0; s2_len + 1]; s1_len + 1];
-        
+
         for i in 0..=s1_len {
             matrix[i][0] = i;
         }
-        
+
         for j in 0..=s2_len {
             matrix[0][j] = j;
         }
-        
+
         for i in 1..=s1_len {
             for j in 1..=s2_len {
-                let cost = if s1_chars[i - 1] == s2_chars[j - 1] { 0 } else { 1 };
+                let cost = if s1_chars[i - 1] == s2_chars[j - 1] {
+                    0
+                } else {
+                    1
+                };
                 matrix[i][j] = [
                     matrix[i - 1][j] + 1,        // 删除
                     matrix[i][j - 1] + 1,        // 插入
                     matrix[i - 1][j - 1] + cost, // 替换
-                ].iter().min().unwrap().clone();
+                ]
+                .iter()
+                .min()
+                .unwrap()
+                .clone();
             }
         }
-        
+
         matrix[s1_len][s2_len]
     }
 
     /// 字符串模板替换
     pub fn template_replace(template: &str, variables: &HashMap<String, String>) -> String {
         let mut result = template.to_string();
-        
+
         for (key, value) in variables {
             let placeholder = format!("{{{}}}", key);
             result = result.replace(&placeholder, value);
         }
-        
+
         result
     }
 
@@ -307,7 +318,7 @@ impl StringUtils {
     pub fn hash_string(s: &str) -> u64 {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = DefaultHasher::new();
         s.hash(&mut hasher);
         hasher.finish()
@@ -335,7 +346,10 @@ mod tests {
     #[test]
     fn test_truncate() {
         assert_eq!(StringUtils::truncate("Hello World", 5), "Hello");
-        assert_eq!(StringUtils::truncate_with_ellipsis("Hello World", 8), "Hello...");
+        assert_eq!(
+            StringUtils::truncate_with_ellipsis("Hello World", 8),
+            "Hello..."
+        );
     }
 
     #[test]

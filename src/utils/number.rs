@@ -1,5 +1,3 @@
-
-
 /// 数字工具结构体
 pub struct NumberUtils;
 
@@ -40,7 +38,7 @@ impl NumberUtils {
         if n % 2 == 0 {
             return false;
         }
-        
+
         let sqrt_n = (n as f64).sqrt() as u64;
         for i in (3..=sqrt_n).step_by(2) {
             if n % i == 0 {
@@ -179,10 +177,10 @@ impl NumberUtils {
         if numbers.is_empty() {
             return None;
         }
-        
+
         let mut sorted = numbers.to_vec();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        
+
         let len = sorted.len();
         if len % 2 == 0 {
             Some((sorted[len / 2 - 1] + sorted[len / 2]) / 2.0)
@@ -194,17 +192,18 @@ impl NumberUtils {
     /// 计算众数
     pub fn mode(numbers: &[i32]) -> Option<i32> {
         use std::collections::HashMap;
-        
+
         if numbers.is_empty() {
             return None;
         }
-        
+
         let mut frequency = HashMap::new();
         for &num in numbers {
             *frequency.entry(num).or_insert(0) += 1;
         }
-        
-        frequency.into_iter()
+
+        frequency
+            .into_iter()
             .max_by_key(|(_, count)| *count)
             .map(|(num, _)| num)
     }
@@ -214,12 +213,11 @@ impl NumberUtils {
         if numbers.len() < 2 {
             return None;
         }
-        
+
         let mean = Self::average(numbers)?;
-        let variance = numbers.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / (numbers.len() - 1) as f64;
-        
+        let variance =
+            numbers.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (numbers.len() - 1) as f64;
+
         Some(variance.sqrt())
     }
 
@@ -228,21 +226,21 @@ impl NumberUtils {
         if base < 2 || base > 36 {
             return "0".to_string();
         }
-        
+
         if num == 0 {
             return "0".to_string();
         }
-        
+
         let digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         let mut result = String::new();
         let mut n = num;
-        
+
         while n > 0 {
             let remainder = (n % base as u64) as usize;
             result.insert(0, digits.chars().nth(remainder).unwrap());
             n /= base as u64;
         }
-        
+
         result
     }
 
@@ -251,10 +249,10 @@ impl NumberUtils {
         if base < 2 || base > 36 {
             return None;
         }
-        
+
         let mut result = 0u64;
         let mut power = 1u64;
-        
+
         for c in s.chars().rev() {
             let digit = match c {
                 '0'..='9' => c as u32 - '0' as u32,
@@ -262,15 +260,15 @@ impl NumberUtils {
                 'a'..='z' => c as u32 - 'a' as u32 + 10,
                 _ => return None,
             };
-            
+
             if digit >= base {
                 return None;
             }
-            
+
             result += digit as u64 * power;
             power *= base as u64;
         }
-        
+
         Some(result)
     }
 
@@ -284,14 +282,14 @@ impl NumberUtils {
     pub fn format_with_commas(num: i64) -> String {
         let num_str = num.to_string();
         let mut result = String::new();
-        
+
         for (i, c) in num_str.chars().rev().enumerate() {
             if i > 0 && i % 3 == 0 {
                 result.insert(0, ',');
             }
             result.insert(0, c);
         }
-        
+
         result
     }
 

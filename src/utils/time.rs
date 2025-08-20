@@ -1,5 +1,8 @@
-use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc, Datelike, FixedOffset, Offset};
-use chrono_tz::{Tz, Asia, America, Europe, Africa, Australia};
+use chrono::{
+    DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate, NaiveDateTime, Offset, TimeZone,
+    Utc,
+};
+use chrono_tz::{Africa, America, Asia, Australia, Europe, Tz};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -61,7 +64,10 @@ impl TimeUtils {
     }
 
     /// 解析字符串为时间
-    pub fn parse_datetime(datetime_str: &str, format: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
+    pub fn parse_datetime(
+        datetime_str: &str,
+        format: &str,
+    ) -> Result<DateTime<Utc>, chrono::ParseError> {
         let naive_datetime = NaiveDateTime::parse_from_str(datetime_str, format)?;
         Ok(Utc.from_utc_datetime(&naive_datetime))
     }
@@ -170,12 +176,13 @@ impl TimeUtils {
 
     /// 从时区偏移创建 DateTime
     pub fn from_offset(datetime: &DateTime<Utc>, offset_hours: i32) -> DateTime<FixedOffset> {
-        let offset = FixedOffset::east_opt(offset_hours * 3600).unwrap_or(FixedOffset::east_opt(0).unwrap());
+        let offset =
+            FixedOffset::east_opt(offset_hours * 3600).unwrap_or(FixedOffset::east_opt(0).unwrap());
         datetime.with_timezone(&offset)
     }
 
     /// 获取时区偏移（相对于 UTC 的小时数）
-    pub fn get_timezone_offset<T: TimeZone>(datetime: &DateTime<T>) -> i32 
+    pub fn get_timezone_offset<T: TimeZone>(datetime: &DateTime<T>) -> i32
     where
         T::Offset: Offset,
     {
@@ -200,14 +207,16 @@ impl TimeUtils {
         timezone: Tz,
     ) -> Result<DateTime<Tz>, Box<dyn std::error::Error>> {
         let naive_datetime = NaiveDateTime::parse_from_str(datetime_str, format)?;
-        timezone.from_local_datetime(&naive_datetime).single()
-           .ok_or_else(|| "Failed to parse datetime in timezone".into())
+        timezone
+            .from_local_datetime(&naive_datetime)
+            .single()
+            .ok_or_else(|| "Failed to parse datetime in timezone".into())
     }
 
     /// 获取常用时区列表
     pub fn get_common_timezones() -> HashMap<&'static str, Tz> {
         let mut timezones = HashMap::new();
-        
+
         // 亚洲时区
         timezones.insert("北京", Asia::Shanghai);
         timezones.insert("东京", Asia::Tokyo);
@@ -215,28 +224,28 @@ impl TimeUtils {
         timezones.insert("新加坡", Asia::Singapore);
         timezones.insert("孟买", Asia::Kolkata);
         timezones.insert("迪拜", Asia::Dubai);
-        
+
         // 欧洲时区
         timezones.insert("伦敦", Europe::London);
         timezones.insert("巴黎", Europe::Paris);
         timezones.insert("柏林", Europe::Berlin);
         timezones.insert("莫斯科", Europe::Moscow);
         timezones.insert("罗马", Europe::Rome);
-        
+
         // 美洲时区
         timezones.insert("纽约", America::New_York);
         timezones.insert("洛杉矶", America::Los_Angeles);
         timezones.insert("芝加哥", America::Chicago);
         timezones.insert("丹佛", America::Denver);
         timezones.insert("圣保罗", America::Sao_Paulo);
-        
+
         // 大洋洲时区
         timezones.insert("悉尼", Australia::Sydney);
         timezones.insert("墨尔本", Australia::Melbourne);
-        
+
         // 非洲时区
         timezones.insert("开罗", Africa::Cairo);
-        
+
         timezones
     }
 
@@ -288,17 +297,29 @@ impl TimeUtils {
         let dt = datetime.unwrap_or_else(|| Utc::now());
         let tz_datetime = dt.with_timezone(&timezone);
         let offset = tz_datetime.offset();
-        
+
         // 简化的夏令时检测：比较当前偏移与标准偏移
         // 这里使用一个简单的启发式方法
-        let jan_dt = timezone.with_ymd_and_hms(dt.year(), 1, 1, 12, 0, 0).single()
-            .unwrap_or_else(|| timezone.with_ymd_and_hms(dt.year(), 1, 2, 12, 0, 0).unwrap());
-        let jul_dt = timezone.with_ymd_and_hms(dt.year(), 7, 1, 12, 0, 0).single()
-            .unwrap_or_else(|| timezone.with_ymd_and_hms(dt.year(), 7, 2, 12, 0, 0).unwrap());
-        
+        let jan_dt = timezone
+            .with_ymd_and_hms(dt.year(), 1, 1, 12, 0, 0)
+            .single()
+            .unwrap_or_else(|| {
+                timezone
+                    .with_ymd_and_hms(dt.year(), 1, 2, 12, 0, 0)
+                    .unwrap()
+            });
+        let jul_dt = timezone
+            .with_ymd_and_hms(dt.year(), 7, 1, 12, 0, 0)
+            .single()
+            .unwrap_or_else(|| {
+                timezone
+                    .with_ymd_and_hms(dt.year(), 7, 2, 12, 0, 0)
+                    .unwrap()
+            });
+
         let jan_offset = jan_dt.offset();
         let jul_offset = jul_dt.offset();
-        
+
         if jan_offset.fix().local_minus_utc() != jul_offset.fix().local_minus_utc() {
             // 有夏令时变化
             let jan_seconds = jan_offset.fix().local_minus_utc();
@@ -312,14 +333,18 @@ impl TimeUtils {
 
     /// 获取时区的标准偏移和夏令时偏移
     pub fn get_timezone_offsets(timezone: Tz, year: i32) -> (i32, i32) {
-        let jan_dt = timezone.with_ymd_and_hms(year, 1, 1, 12, 0, 0).single()
+        let jan_dt = timezone
+            .with_ymd_and_hms(year, 1, 1, 12, 0, 0)
+            .single()
             .unwrap_or_else(|| timezone.with_ymd_and_hms(year, 1, 2, 12, 0, 0).unwrap());
-        let jul_dt = timezone.with_ymd_and_hms(year, 7, 1, 12, 0, 0).single()
+        let jul_dt = timezone
+            .with_ymd_and_hms(year, 7, 1, 12, 0, 0)
+            .single()
             .unwrap_or_else(|| timezone.with_ymd_and_hms(year, 7, 2, 12, 0, 0).unwrap());
-        
+
         let jan_offset = jan_dt.offset().fix().local_minus_utc() / 3600;
         let jul_offset = jul_dt.offset().fix().local_minus_utc() / 3600;
-        
+
         if jan_offset == jul_offset {
             // 无夏令时
             (jan_offset, jan_offset)
@@ -334,43 +359,46 @@ impl TimeUtils {
         let dt = datetime.unwrap_or_else(|| Utc::now());
         let dt1 = dt.with_timezone(&tz1);
         let dt2 = dt.with_timezone(&tz2);
-        
+
         let offset1 = dt1.offset().fix().local_minus_utc() / 3600;
         let offset2 = dt2.offset().fix().local_minus_utc() / 3600;
-        
+
         offset1 - offset2
     }
 
     /// 获取世界时钟 - 显示多个时区的当前时间
     pub fn world_clock(timezones: &[(&str, Tz)]) -> Vec<WorldClockEntry> {
         let now = Utc::now();
-        
-        timezones.iter().map(|(name, tz)| {
-            let local_time = now.with_timezone(tz);
-            WorldClockEntry {
-                city_name: name.to_string(),
-                timezone: *tz,
-                local_time,
-                utc_offset: Self::get_timezone_offset(&local_time),
-                is_dst: Self::is_dst_active(*tz, Some(now)),
-            }
-        }).collect()
+
+        timezones
+            .iter()
+            .map(|(name, tz)| {
+                let local_time = now.with_timezone(tz);
+                WorldClockEntry {
+                    city_name: name.to_string(),
+                    timezone: *tz,
+                    local_time,
+                    utc_offset: Self::get_timezone_offset(&local_time),
+                    is_dst: Self::is_dst_active(*tz, Some(now)),
+                }
+            })
+            .collect()
     }
 
     /// 查找与给定时间最匹配的时区
     pub fn find_timezone_by_offset(offset_hours: i32) -> Vec<Tz> {
         let test_time = Utc::now();
         let mut matching_timezones = Vec::new();
-        
+
         for (_, timezone) in Self::get_common_timezones() {
             let tz_time = test_time.with_timezone(&timezone);
             let tz_offset = Self::get_timezone_offset(&tz_time);
-            
+
             if tz_offset == offset_hours {
                 matching_timezones.push(timezone);
             }
         }
-        
+
         matching_timezones
     }
 
@@ -481,7 +509,7 @@ mod tests {
         let now = TimeUtils::now_utc();
         let timestamp = TimeUtils::timestamp();
         let from_timestamp = TimeUtils::from_timestamp(timestamp).unwrap();
-        
+
         // 允许 1 秒的误差
         assert!((now.timestamp() - from_timestamp.timestamp()).abs() <= 1);
     }
@@ -491,7 +519,7 @@ mod tests {
         let now = TimeUtils::now_utc();
         let formatted = TimeUtils::format_default(&now);
         let parsed = TimeUtils::parse_default(&formatted).unwrap();
-        
+
         // 由于格式化会丢失毫秒，所以比较到秒级
         assert_eq!(now.timestamp(), parsed.timestamp());
     }
@@ -501,7 +529,7 @@ mod tests {
         let start = TimeUtils::now_utc();
         let end = TimeUtils::add_hours(&start, 1);
         let middle = TimeUtils::add_minutes(&start, 30);
-        
+
         let range = TimeRange::new(start, end);
         assert!(range.contains(&middle));
         assert_eq!(range.duration(), Duration::hours(1));
@@ -512,7 +540,7 @@ mod tests {
         let utc_time = TimeUtils::now_utc();
         let beijing_time = TimeUtils::to_timezone(&utc_time, Asia::Shanghai);
         let back_to_utc = TimeUtils::to_utc(&beijing_time);
-        
+
         // 允许毫秒级误差
         assert!((utc_time.timestamp() - back_to_utc.timestamp()).abs() <= 1);
     }
@@ -522,7 +550,7 @@ mod tests {
         let utc_time = TimeUtils::now_utc();
         let beijing_time = TimeUtils::to_timezone(&utc_time, Asia::Shanghai);
         let offset = TimeUtils::get_timezone_offset(&beijing_time);
-        
+
         // 北京时间通常是 UTC+8
         assert_eq!(offset, 8);
     }
@@ -532,7 +560,7 @@ mod tests {
         let beijing_tz = TimeUtils::get_timezone_by_name("北京");
         assert!(beijing_tz.is_some());
         assert_eq!(beijing_tz.unwrap(), Asia::Shanghai);
-        
+
         let invalid_tz = TimeUtils::get_timezone_by_name("无效时区");
         assert!(invalid_tz.is_none());
     }
@@ -544,10 +572,10 @@ mod tests {
             ("纽约", America::New_York),
             ("伦敦", Europe::London),
         ];
-        
+
         let world_clock = TimeUtils::world_clock(&timezones);
         assert_eq!(world_clock.len(), 3);
-        
+
         for entry in world_clock {
             assert!(!entry.city_name.is_empty());
             assert!(entry.utc_offset >= -12 && entry.utc_offset <= 14);
@@ -558,7 +586,7 @@ mod tests {
     fn test_timezone_converter() {
         let converter = TimezoneConverter::new(Asia::Shanghai, America::New_York);
         let time_diff = converter.get_time_difference();
-        
+
         // 北京和纽约的时差应该在 12-13 小时之间（取决于夏令时）
         assert!(time_diff >= 12 && time_diff <= 13);
     }
@@ -567,11 +595,11 @@ mod tests {
     fn test_find_timezone_by_offset() {
         let timezones = TimeUtils::find_timezone_by_offset(8);
         assert!(!timezones.is_empty());
-        
+
         // 应该包含亚洲的一些时区
-        let contains_asia = timezones.iter().any(|&tz| {
-            matches!(tz, Asia::Shanghai | Asia::Singapore)
-        });
+        let contains_asia = timezones
+            .iter()
+            .any(|&tz| matches!(tz, Asia::Shanghai | Asia::Singapore));
         assert!(contains_asia);
     }
 }

@@ -1,6 +1,6 @@
 /*!
  * 工具函数模块
- * 
+ *
  * 提供各种通用的工具函数和辅助功能，包括：
  * - 身份验证和 JWT 处理
  * - 密码加密和验证
@@ -11,16 +11,16 @@
  * - 加密和编码
  * - 类型转换
  * - 格式化输出
- * 
+ *
  * # 设计原则
- * 
+ *
  * - **纯函数**: 大部分工具函数都是纯函数，无副作用
  * - **类型安全**: 充分利用 Rust 的类型系统保证安全性
  * - **性能优化**: 针对常用操作进行性能优化
  * - **易于测试**: 提供完整的单元测试覆盖
- * 
+ *
  * # 子模块
- * 
+ *
  * - `auth`: JWT Token 生成和验证
  * - `password`: 密码哈希和验证
  * - `time`: 时间日期处理和时区转换
@@ -69,13 +69,13 @@ pub mod device;
 
 // 重新导出所有工具函数，方便外部使用
 pub use auth::*;
-pub use password::*;
-pub use time::*;
-pub use string::*;
-pub use number::*;
 pub use collection::*;
-pub use crypto::*;
 pub use convert::*;
-pub use format::*;
-pub use redis::*;
+pub use crypto::*;
 pub use device::*;
+pub use format::*;
+pub use number::*;
+pub use password::*;
+pub use redis::*;
+pub use string::*;
+pub use time::*;
